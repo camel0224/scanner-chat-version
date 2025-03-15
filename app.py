@@ -5,14 +5,16 @@ import numpy as np
 import requests
 from pyzbar.pyzbar import decode
 from bs4 import BeautifulSoup
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+import pandas as pd
+import os
 
-# Google Sheets Setup
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
-client = gspread.authorize(creds)
-sheet = client.open("Toilet Inventory").sheet1
+# Local CSV storage
+CSV_FILE = "toilet_inventory.csv"
+
+# Initialize CSV file if not exists
+if not os.path.exists(CSV_FILE):
+    df = pd.DataFrame(columns=["Product Number", "Barcode", "Ferguson Link", "Home Depot Link", "Lowe's Link"])
+    df.to_csv(CSV_FILE, index=False)
 
 # Streamlit UI
 st.title("Toilet Inventory Scanner 📦🚽")
@@ -73,8 +75,17 @@ if image_file:
         for store, link in search_results.items():
             st.write(f"**{store}:** [{link}]({link})")
 
-    # 5️⃣ Save to Google Sheets
-    if st.button("Save to Google Sheets"):
-        sheet.append_row([product_number, barcode_result or "N/A", search_results.get("Ferguson", "Not Found"),
-                          search_results.get("Home Depot", "Not Found"), search_results.get("Lowe's", "Not Found")])
-        st.success("Saved to Google Sheets! ✅")
+    # 5️⃣ Save to Local CSV
+    if st.button("Save to Inventory"):
+        df = pd.read_csv(CSV_FILE)
+        new_data = pd.DataFrame([[product_number, barcode_result or "N/A", search_results.get("Ferguson", "Not Found"),
+                                  search_results.get("Home Depot", "Not Found"), search_results.get("Lowe's", "Not Found")]],
+                                columns=df.columns)
+        df = pd.concat([df, new_data], ignore_index=True)
+        df.to_csv(CSV_FILE, index=False)
+        st.success("Saved to inventory CSV! ✅")
+
+# 6️⃣ Display Inventory
+if st.checkbox("📋 View Inventory"):
+    df = pd.read_csv(CSV_FILE)
+    st.dataframe(df)
